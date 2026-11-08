@@ -1,15 +1,15 @@
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI
 from google import genai
 from google.genai import types
-from pydantic import BaseModel
 from typing import Literal
+from fastapi import FastAPI, HTTPException
+from google.genai import errors
+from pydantic import BaseModel, ValidationError
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-MODEL_NAME = "gemini-3.5-flash-lite"
-
+MODEL_CANDIDATES = ["abc", "xyz"]
 app = FastAPI()
 
 class SupplierInfo(BaseModel):
@@ -37,22 +37,34 @@ def get_risk_level(score: int) -> str:
     else:
         return "高风险"
     
+
 def judge_scope(business_scope: str) -> ScopeJudgment:
     prompt = (
-        "你是化工贸易公司的客商准入审核助手。"
+     "你是化工贸易公司的客商准入审核助手。"
         "请判断下面这家供应商的经营范围，与化工原料、大宗商品贸易的相关程度，"
         "relevance 只能是：高度相关、部分相关、无关 之一；reason 用一句话说明理由。\n\n"
         f"经营范围：{business_scope}"
     )
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=ScopeJudgment,
-        ),
-    )
-    return ScopeJudgment.model_validate_json(response.text)
+
+    for model_name in MODEL_CANDIDATES:
+        try:
+            response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=ScopeJudgment,
+                ),
+            )
+            return ScopeJudgment.model_validate_json(response.text)
+        
+        except errors.APIError as e:
+            print(f"模型 {model_name} 调用失败：{e}")
+        except  ValidationError as e:
+            print(f"模型 {model_name} 返回格式不对：{e}")
+
+    # 循环走完都没有 return，说明所有模型都失败了
+    raise HTTPException(status_code=503, detail="AI 服务暂时不可用，请稍后重试")
 
 @app.get("/")
 def health_check():
