@@ -9,7 +9,7 @@ from pydantic import BaseModel, ValidationError
 
 load_dotenv()
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-MODEL_CANDIDATES = ["abc", "xyz"]
+MODEL_CANDIDATES = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash"]
 app = FastAPI()
 
 class SupplierInfo(BaseModel):
