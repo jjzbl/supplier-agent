@@ -2,7 +2,7 @@ from typing import TypedDict
 from main import judge_scope,get_risk_level
 from fastapi import HTTPException
 from langgraph.graph import StateGraph, START, END
-    
+from langgraph.checkpoint.memory import InMemorySaver    
 
 class SupplierState(TypedDict):
     name: str                   # 公司名称
@@ -83,12 +83,35 @@ builder.add_edge("fallback", "aggregate")
 builder.add_conditional_edges("aggregate", route_after_aggregate)
 builder.add_edge("human_review", END)
 
-graph = builder.compile()
+graph = builder.compile(checkpointer= InMemorySaver())
 
-result = graph.invoke({
+config = {"configurable": {"thread_id": "1"}}
+
+config2 = {"configurable": {"thread_id": "2"}}
+
+result1 = graph.invoke({
     "name": "测试化工有限公司",
     "years_established":2,
     "registered_capital": 100,
     "business_scope": "奶茶店",
-})
-print(result)
+}, config)
+
+result2 = graph.invoke({
+    #"name": "测试食品化工有限公司",
+    "years_established":24,
+    "registered_capital": 1500,
+    "business_scope": "食品化工企业",
+}, config)
+
+result3 = graph.invoke({
+    #"name": "测试食品化工有限公司",
+    "years_established":24,
+    "registered_capital": 1500,
+    "business_scope": "食品化工企业",
+}, config2)
+
+print(result1, result2, result3)
+
+#for snapshot in graph.get_state_history(config):
+    #print(snapshot.next) 
+    #print(snapshot.values)
